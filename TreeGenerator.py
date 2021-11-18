@@ -4,7 +4,7 @@ import bmesh
 import math
 from bpy.types import Mesh, Object
 import mathutils
-
+import numpy as np
 
 bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
 # löscht selektierte objekte
@@ -21,15 +21,39 @@ treeMesh.from_mesh(mesh)
 
 print(" ------- ")
 
-minBranchLength: float = 0.05
+minBranchLength: float = 0.025
 
 lengthFactor: float = 1.6180339
 angle: float = 137.5077 / 2
 
+
+truncVector: mathutils.Vector = mathutils.Vector((0, 0, 1))
+
 firstVertex: BMVert = treeMesh.verts.new((0, 0, 0))
-secondVertex: BMVert = bmesh.ops.extrude_vert_indiv(
+branchVert: BMVert = bmesh.ops.extrude_vert_indiv(
     treeMesh, verts=[firstVertex])['verts'][0]
-secondVertex.co = (0, 0, 1)
+branchVert.co = truncVector
+
+
+starVert1Vector: mathutils.Vector = truncVector.copy()
+starVert1Vector /= lengthFactor
+starVert1Vector.rotate(mathutils.Euler((math.radians(angle), 0, 0)))
+
+starVert1: BMVert = bmesh.ops.extrude_vert_indiv(
+    treeMesh, verts=[branchVert])['verts'][0]
+starVert1.co = truncVector + starVert1Vector
+
+starVert2Vector: mathutils.Vector = mathutils.Vector(starVert1.co)
+starVert2Vector.rotate(mathutils.Euler((0, 0, math.radians(360/3))))
+starVert2: BMVert = bmesh.ops.extrude_vert_indiv(
+    treeMesh, verts=[branchVert])['verts'][0]
+starVert2.co = starVert2Vector
+
+starVert3Vector: mathutils.Vector = mathutils.Vector(starVert2.co)
+starVert3Vector.rotate(mathutils.Euler((0, 0, math.radians(360/3))))
+starVert3: BMVert = bmesh.ops.extrude_vert_indiv(
+    treeMesh, verts=[branchVert])['verts'][0]
+starVert3.co = starVert3Vector
 
 for v in treeMesh.verts:
 
@@ -43,11 +67,55 @@ for v in treeMesh.verts:
 
         edgeVector: mathutils.Vector = outerVert.co - innerVert.co
         edgeVector /= lengthFactor
+        normalizedEdgeVector: mathutils.Vector = edgeVector.normalized()
 
         if edgeVector.magnitude < minBranchLength:
             break
 
-        leftVector: mathutils.Vector = edgeVector.copy()
+        crossedZVector = edgeVector.cross((0, 0, 1)).normalized()
+        crossedZVector *= edgeVector.magnitude
+        crossedZVert = bmesh.ops.extrude_vert_indiv(
+            treeMesh, verts=[outerVert])['verts'][0]
+        crossedZWithEdgeVector: mathutils.Vector = crossedZVector + edgeVector
+        crossedZWithEdgeVector.normalize()
+        crossedZWithEdgeVector *= edgeVector.magnitude
+
+        # until another solution is found, the first branch get's randomly rotated to prevent clustered formations due to interference
+
+        wMatrix: mathutils.Matrix = mathutils.Matrix(
+            ((0, - normalizedEdgeVector.z,  normalizedEdgeVector.y), (normalizedEdgeVector.z, 0, - normalizedEdgeVector.x), (- normalizedEdgeVector.y,  normalizedEdgeVector.x, 0)))
+        thirstVectorAngle: float = math.radians(
+            math.radians(np.random.uniform(0, 360)))
+        thirstVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
+            3) + math.sin(thirstVectorAngle) * wMatrix + (2 * math.sin(thirstVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
+
+        crossedZWithEdgeVector.rotate(thirstVectorRodriguesMatrix)
+
+        crossedZVert.co += crossedZWithEdgeVector
+
+        secondVectorAngle: float = math.radians(360 / 3)
+        secondVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
+            3) + math.sin(secondVectorAngle) * wMatrix + (2 * math.sin(secondVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
+
+        secondVector: mathutils.Vector = crossedZWithEdgeVector.copy()
+        secondVector.rotate(secondVectorRodriguesMatrix)
+        secondVertex: BMVert = bmesh.ops.extrude_vert_indiv(
+            treeMesh, verts=[outerVert])['verts'][0]
+
+        secondVertex.co += secondVector
+
+        thirdVectorAngle: float = math.radians((360 / 3) * 2)
+        thirdVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
+            3) + math.sin(thirdVectorAngle) * wMatrix + (2 * math.sin(thirdVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
+
+        thirdVector: mathutils.Vector = crossedZWithEdgeVector.copy()
+        thirdVector.rotate(thirdVectorRodriguesMatrix)
+        thirdVertex: BMVert = bmesh.ops.extrude_vert_indiv(
+            treeMesh, verts=[outerVert])['verts'][0]
+
+        thirdVertex.co += thirdVector
+
+        """ leftVector: mathutils.Vector = edgeVector.copy()
         rightVector: mathutils.Vector = edgeVector.copy()
 
         leftVertex = bmesh.ops.extrude_vert_indiv(
@@ -55,34 +123,14 @@ for v in treeMesh.verts:
         rightVertex = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[outerVert])['verts'][0]
 
-        rotx = math.atan2(edgeVector.y, edgeVector.z)
-        roty = math.atan2(edgeVector.x * math.cos(rotx), edgeVector.z)
-        rotz = math.atan2(math.cos(rotx), math.sin(rotx) * math.sin(roty))
-
-        edgeVectorRotation: mathutils.Euler = mathutils.Euler(
-            (rotx, roty, rotz), 'XYZ')
-
-        #edgeVectorMinusRotation: mathutils.Euler = mathutils.Euler((rotx - 45, roty - 45, rotz - 45), 'XYZ')
-
-        additionalRotation: mathutils.Euler = mathutils.Euler(
-            (math.radians(angle), math.radians(angle), 0.0), 'XYZ')
-
-        additionalNegativeRotation: mathutils.Euler = mathutils.Euler(
-            (math.radians(-angle), math.radians(-angle), 0.0), 'XYZ')
-
-        finalLeftRotation: mathutils.Euler = edgeVectorRotation.copy()
-        finalLeftRotation.rotate(additionalRotation)
-
-        finalRightRotation: mathutils.Euler = edgeVectorRotation.copy()
-        finalRightRotation.rotate(additionalRotation)
-
-        leftVector.rotate(additionalRotation)
-        rightVector.rotate(additionalNegativeRotation)
+        leftVector.rotate(mathutils.Euler(
+            (math.radians(-angle), math.radians(-angle), math.radians(-angle)), 'XYZ'))
+        rightVector.rotate(mathutils.Euler(
+            (math.radians(angle), math.radians(angle), math.radians(angle)), 'XYZ'))
 
         leftVertex.co += leftVector
-        rightVertex.co += rightVector
+        rightVertex.co += rightVector """
 
-        print("lölasdf")
 
 treeMesh.to_mesh(mesh)
 treeMesh.free()
