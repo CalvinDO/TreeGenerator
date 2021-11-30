@@ -84,8 +84,7 @@ for v in treeMesh.verts:
 
         wMatrix: mathutils.Matrix = mathutils.Matrix(
             ((0, - normalizedEdgeVector.z,  normalizedEdgeVector.y), (normalizedEdgeVector.z, 0, - normalizedEdgeVector.x), (- normalizedEdgeVector.y,  normalizedEdgeVector.x, 0)))
-        thirstVectorAngle: float = math.radians(
-            math.radians(np.random.uniform(0, 360)))
+        thirstVectorAngle: float = math.radians(np.random.uniform(0, 360))
         thirstVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
             3) + math.sin(thirstVectorAngle) * wMatrix + (2 * math.sin(thirstVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
 
