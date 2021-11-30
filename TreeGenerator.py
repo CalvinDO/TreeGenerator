@@ -5,6 +5,7 @@ import math
 from bpy.types import Mesh, Object
 import mathutils
 import numpy as np
+from numpy.core.numeric import cross, outer
 
 bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
 # löscht selektierte objekte
@@ -25,6 +26,39 @@ minBranchLength: float = 0.025
 
 lengthFactor: float = 1.6180339
 angle: float = 137.5077 / 2
+
+
+def getRodriguesMatrix(axisVector: mathutils.Vector, angle: float):
+    w: mathutils.Matrix = mathutils.Matrix(
+        ((0, - axisVector.z,  axisVector.y), (axisVector.z, 0, - axisVector.x), (- axisVector.y,  axisVector.x, 0)))
+    return mathutils.Matrix.Identity(
+        3) + math.sin(angle) * w + (2 * math.sin(angle/2)**2) * mathutils.Matrix(np.matmul(w, w))
+
+
+def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDeg: float):
+    lastStarVecCopy: mathutils.Vector = _lastStarVec.copy()
+    lastStarVecCopy.rotate(getRodriguesMatrix(
+        _normalizedOriginVector, math.radians(_angleDeg)))
+
+    outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
+        treeMesh, verts=[_centerVert])['verts'][0]
+    outputVert.co += lastStarVecCopy
+    return outputVert
+
+
+def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector):
+    crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
+    crossedZVector *= _originVector.magnitude
+    firstStarVert: BMVert = bmesh.ops.extrude_vert_indiv(
+        treeMesh, verts=[_centerVert])['verts'][0]
+    firstStarVector: mathutils.Vector = crossedZVector + _originVector
+    firstStarVector.normalize()
+    firstStarVector *= _originVector.magnitude
+    # until another solution is found, the first branch get's randomly rotated to prevent clustered formations due to interference
+    firstStarVector.rotate(getRodriguesMatrix(
+        _originVector.normalized(), math.radians(np.random.uniform(0, 360))))
+    firstStarVert.co += firstStarVector
+    return firstStarVert
 
 
 truncVector: mathutils.Vector = mathutils.Vector((0, 0, 1))
@@ -55,6 +89,7 @@ starVert3: BMVert = bmesh.ops.extrude_vert_indiv(
     treeMesh, verts=[branchVert])['verts'][0]
 starVert3.co = starVert3Vector
 
+
 for v in treeMesh.verts:
 
     if (len(v.link_edges) == 1) and v.co.z > 0.1:
@@ -65,70 +100,22 @@ for v in treeMesh.verts:
             innerVert = outerVert
             outerVert = v
 
-        edgeVector: mathutils.Vector = outerVert.co - innerVert.co
-        edgeVector /= lengthFactor
-        normalizedEdgeVector: mathutils.Vector = edgeVector.normalized()
+        originVector: mathutils.Vector = outerVert.co - innerVert.co
+        originVector /= lengthFactor
+        normalizedOriginVector: mathutils.Vector = originVector.normalized()
 
-        if edgeVector.magnitude < minBranchLength:
+        if originVector.magnitude < minBranchLength:
             break
 
-        crossedZVector = edgeVector.cross((0, 0, 1)).normalized()
-        crossedZVector *= edgeVector.magnitude
-        crossedZVert = bmesh.ops.extrude_vert_indiv(
-            treeMesh, verts=[outerVert])['verts'][0]
-        crossedZWithEdgeVector: mathutils.Vector = crossedZVector + edgeVector
-        crossedZWithEdgeVector.normalize()
-        crossedZWithEdgeVector *= edgeVector.magnitude
+        firstStarVert: BMVert = getExtrudedFirstStarVert(
+            outerVert, originVector, truncVector)
+        firstStarVec: mathutils.Vector = firstStarVert.co - outerVert.co
 
-        # until another solution is found, the first branch get's randomly rotated to prevent clustered formations due to interference
+        secondStarVert: BMVert = getExtrudedRotatedStarVertex(
+            outerVert, firstStarVec, normalizedOriginVector, 360 / 3)
 
-        wMatrix: mathutils.Matrix = mathutils.Matrix(
-            ((0, - normalizedEdgeVector.z,  normalizedEdgeVector.y), (normalizedEdgeVector.z, 0, - normalizedEdgeVector.x), (- normalizedEdgeVector.y,  normalizedEdgeVector.x, 0)))
-        thirstVectorAngle: float = math.radians(np.random.uniform(0, 360))
-        thirstVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
-            3) + math.sin(thirstVectorAngle) * wMatrix + (2 * math.sin(thirstVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
-
-        crossedZWithEdgeVector.rotate(thirstVectorRodriguesMatrix)
-
-        crossedZVert.co += crossedZWithEdgeVector
-
-        secondVectorAngle: float = math.radians(360 / 3)
-        secondVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
-            3) + math.sin(secondVectorAngle) * wMatrix + (2 * math.sin(secondVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
-
-        secondVector: mathutils.Vector = crossedZWithEdgeVector.copy()
-        secondVector.rotate(secondVectorRodriguesMatrix)
-        secondVertex: BMVert = bmesh.ops.extrude_vert_indiv(
-            treeMesh, verts=[outerVert])['verts'][0]
-
-        secondVertex.co += secondVector
-
-        thirdVectorAngle: float = math.radians((360 / 3) * 2)
-        thirdVectorRodriguesMatrix: mathutils.Matrix = mathutils.Matrix.Identity(
-            3) + math.sin(thirdVectorAngle) * wMatrix + (2 * math.sin(thirdVectorAngle/2)**2) * mathutils.Matrix(np.matmul(wMatrix, wMatrix))
-
-        thirdVector: mathutils.Vector = crossedZWithEdgeVector.copy()
-        thirdVector.rotate(thirdVectorRodriguesMatrix)
-        thirdVertex: BMVert = bmesh.ops.extrude_vert_indiv(
-            treeMesh, verts=[outerVert])['verts'][0]
-
-        thirdVertex.co += thirdVector
-
-        """ leftVector: mathutils.Vector = edgeVector.copy()
-        rightVector: mathutils.Vector = edgeVector.copy()
-
-        leftVertex = bmesh.ops.extrude_vert_indiv(
-            treeMesh, verts=[outerVert])['verts'][0]
-        rightVertex = bmesh.ops.extrude_vert_indiv(
-            treeMesh, verts=[outerVert])['verts'][0]
-
-        leftVector.rotate(mathutils.Euler(
-            (math.radians(-angle), math.radians(-angle), math.radians(-angle)), 'XYZ'))
-        rightVector.rotate(mathutils.Euler(
-            (math.radians(angle), math.radians(angle), math.radians(angle)), 'XYZ'))
-
-        leftVertex.co += leftVector
-        rightVertex.co += rightVector """
+        thirdStarVert: BMVert = getExtrudedRotatedStarVertex(
+            outerVert, firstStarVec, normalizedOriginVector, 360 / 3 * 2)
 
 
 treeMesh.to_mesh(mesh)
