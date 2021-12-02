@@ -116,7 +116,7 @@ for v in treeMesh.verts:
 
         thirdStarVert: BMVert = getExtrudedRotatedStarVertex(
             outerVert, firstStarVec, normalizedOriginVector, 360 / 3 * 2)
-
+        
 
 treeMesh.to_mesh(mesh)
 treeMesh.free()
