@@ -25,7 +25,7 @@ print(" ------- ")
 minBranchLength: float = 0.025
 
 lengthFactor: float = 1.6180339
-angle: float = 137.5077 / 2
+angle: float = 0
 
 
 def getRodriguesMatrix(axisVector: mathutils.Vector, angle: float):
@@ -47,16 +47,20 @@ def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Ve
 
 
 def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector):
+    _originVector /= lengthFactor
     crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
     crossedZVector *= _originVector.magnitude
     firstStarVert: BMVert = bmesh.ops.extrude_vert_indiv(
         treeMesh, verts=[_centerVert])['verts'][0]
     firstStarVector: mathutils.Vector = crossedZVector + _originVector
+    firstStarVector.rotate(getRodriguesMatrix(
+        crossedZVector.normalized(), math.radians(angle)))
     firstStarVector.normalize()
     firstStarVector *= _originVector.magnitude
     # until another solution is found, the first branch get's randomly rotated to prevent clustered formations due to interference
     firstStarVector.rotate(getRodriguesMatrix(
         _originVector.normalized(), math.radians(np.random.uniform(0, 360))))
+
     firstStarVert.co += firstStarVector
     return firstStarVert
 
@@ -64,34 +68,24 @@ def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vecto
 truncVector: mathutils.Vector = mathutils.Vector((0, 0, 1))
 
 firstVertex: BMVert = treeMesh.verts.new((0, 0, 0))
-branchVert: BMVert = bmesh.ops.extrude_vert_indiv(
+
+centerVert: BMVert = bmesh.ops.extrude_vert_indiv(
     treeMesh, verts=[firstVertex])['verts'][0]
-branchVert.co = truncVector
+centerVert.co = truncVector
 
 
-starVert1Vector: mathutils.Vector = truncVector.copy()
-starVert1Vector /= lengthFactor
-starVert1Vector.rotate(mathutils.Euler((math.radians(angle), 0, 0)))
+starVert1 = getExtrudedFirstStarVert(
+    centerVert, truncVector, mathutils.Vector((1, 0, 0)))
+starVec1: mathutils.Vector = starVert1.co - centerVert.co
 
-starVert1: BMVert = bmesh.ops.extrude_vert_indiv(
-    treeMesh, verts=[branchVert])['verts'][0]
-starVert1.co = truncVector + starVert1Vector
+starVert2 = getExtrudedRotatedStarVertex(
+    centerVert, starVec1, truncVector.normalized(),  360 / 3)
 
-starVert2Vector: mathutils.Vector = mathutils.Vector(starVert1.co)
-starVert2Vector.rotate(mathutils.Euler((0, 0, math.radians(360/3))))
-starVert2: BMVert = bmesh.ops.extrude_vert_indiv(
-    treeMesh, verts=[branchVert])['verts'][0]
-starVert2.co = starVert2Vector
-
-starVert3Vector: mathutils.Vector = mathutils.Vector(starVert2.co)
-starVert3Vector.rotate(mathutils.Euler((0, 0, math.radians(360/3))))
-starVert3: BMVert = bmesh.ops.extrude_vert_indiv(
-    treeMesh, verts=[branchVert])['verts'][0]
-starVert3.co = starVert3Vector
+starVert3 = getExtrudedRotatedStarVertex(
+    centerVert, starVec1, truncVector.normalized(), 360 / 3 * 2)
 
 
 for v in treeMesh.verts:
-
     if (len(v.link_edges) == 1) and v.co.z > 0.1:
 
         innerVert, outerVert = v.link_edges[0].verts
@@ -101,22 +95,22 @@ for v in treeMesh.verts:
             outerVert = v
 
         originVector: mathutils.Vector = outerVert.co - innerVert.co
-        originVector /= lengthFactor
-        normalizedOriginVector: mathutils.Vector = originVector.normalized()
 
-        if originVector.magnitude < minBranchLength:
-            break
+        normalizedOriginVector: mathutils.Vector = originVector.normalized()
 
         firstStarVert: BMVert = getExtrudedFirstStarVert(
             outerVert, originVector, truncVector)
         firstStarVec: mathutils.Vector = firstStarVert.co - outerVert.co
+
+        if firstStarVec.magnitude < minBranchLength:
+            break
 
         secondStarVert: BMVert = getExtrudedRotatedStarVertex(
             outerVert, firstStarVec, normalizedOriginVector, 360 / 3)
 
         thirdStarVert: BMVert = getExtrudedRotatedStarVertex(
             outerVert, firstStarVec, normalizedOriginVector, 360 / 3 * 2)
-        
+
 
 treeMesh.to_mesh(mesh)
 treeMesh.free()
