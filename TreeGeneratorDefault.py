@@ -178,40 +178,6 @@ branch2.fork()
 # treeMesh, verts=[centerVert])['verts'][0]
 #starVert4.co += scaledTruncVector
 
-"""
-for v in treeMesh.verts:
-    if (len(v.link_edges) == 1) and v.co.z > 0.1:
-
-        innerVert, outerVert = v.link_edges[0].verts
-
-        if innerVert == v:
-            innerVert = outerVert
-            outerVert = v
-
-        originVector: mathutils.Vector = outerVert.co - innerVert.co
-        if originVector.x == 0 and originVector.y == 0:
-            randomizeVector(originVector)
-
-        currentOriginVectorLength = originVector.magnitude
-        normalizedOriginVector: mathutils.Vector = originVector.normalized()
-
-        firstStarVert: BMVert = getExtrudedFirstStarVert(
-            outerVert, originVector.copy(), truncVector)
-        firstStarVec: mathutils.Vector = firstStarVert.co - outerVert.co
-
-        if firstStarVec.magnitude < minBranchLength:
-            break
-
-        secondStarVert: BMVert = getExtrudedRotatedStarVertex(
-            outerVert, firstStarVec, normalizedOriginVector, 360 / 2)
-
-        # thirdStarVert: BMVert = getExtrudedRotatedStarVertex(
-        #   outerVert, firstStarVec, normalizedOriginVector, 360 / 3 * 2)
-
-       # thouthStarVert: BMVert = bmesh.ops.extrude_vert_indiv(treeMesh, verts=[outerVert])['verts'][0]
-        #thouthStarVert.co += originVector
-
-"""
 
 treeMesh.to_mesh(mesh)
 treeMesh.free()
