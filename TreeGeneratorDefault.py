@@ -150,7 +150,11 @@ scaledTruncVector /= lengthDivider
 
 randomizeVector(scaledTruncVector)
 
+
+# initial branches
+
 firstVertex: BMVert = treeMesh.verts.new((0, 0, 0))
+
 
 centerVert: BMVert = bmesh.ops.extrude_vert_indiv(
     treeMesh, verts=[firstVertex])['verts'][0]
@@ -159,17 +163,24 @@ centerVert.co = truncVector
 
 starVert1: BMVert = getExtrudedFirstStarVert(
     centerVert, truncVector, mathutils.Vector((1, 0, 0)), lengthDivider)
+
 starVec1: mathutils.Vector = starVert1.co - centerVert.co
 
 branch1: Branch = Branch(starVert1, starVec1, 1, lengthDivider)
 branch1.fork()
 
+
+randomStarAngle: float = np.random.uniform(
+    180 - starAngleStandardDerivation, 180 + starAngleStandardDerivation)
+
 starVert2: BMVert = getExtrudedRotatedStarVertex(
-    centerVert, starVec1, truncVector.normalized(),  360 / 2, lengthDivider)
+    centerVert, starVec1, truncVector.normalized(),  randomStarAngle, lengthDivider)
+
 starVec2: mathutils.Vector = starVert2.co - centerVert.co
 
 branch2: Branch = Branch(starVert2, starVec2, 1, lengthDivider)
 branch2.fork()
+
 
 # starVert3 = getExtrudedRotatedStarVertex(
 # centerVert, starVec1, truncVector.normalized(), 360 / 3 * 2)

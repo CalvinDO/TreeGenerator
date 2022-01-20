@@ -1,0 +1,74 @@
+bl_info = {
+    "name": "Cubedimension",
+    "author": "Ich <ich@webmail.hs-furtwangen.de>",
+    "version": (1, 0),
+    "blender": (2, 91, 2),
+    "location": "View3D > Search Menu > Cubedimension",
+    "description": "Adds a Tower of random Cubes",
+    "warning": "",
+    "doc_url": "",
+    "category": "Add Mesh",
+}
+
+
+
+import bpy
+import random
+
+
+class OT_MESH_CUBETOWER(bpy.types.Operator):
+    """Generate a Cube Tower"""
+    
+    bl_idname = "object.add_cubetower"
+    bl_label = "Add Cube Tower"
+    bl_options = {"REGISTER", "UNDO"}
+    
+    
+    num = bpy.props.IntProperty(
+            name = "Cube Number",
+            description = "Defines the number of cubes",
+            default = 5)
+
+
+    cube_size_min = bpy.props.FloatProperty(
+        name = "Min Cube Size",
+        default = 0.5)
+        
+        
+    cube_size_max = bpy.props.FloatProperty(
+        name = "Max Cube Size",
+        default = 2.0)
+        
+    @classmethod
+    def poll(cls, context):
+        return bpy.context.mode == "OBJECT"
+   
+   
+    
+    def execute(self, context):
+        
+        
+        
+        
+        total_height = 0
+        rand_offset = 0.4
+        
+        bpy.ops.mesh.primitive_plane_add(size = 30)
+
+        for i in range(self.num):
+            c_cube_size = random.uniform(self.cube_size_min, self.cube_size_max)
+            bpy.ops.mesh.primitive_cube_add(location = (0,0,total_height + c_cube_size/2), size = c_cube_size)
+            
+            total_height += c_cube_size
+            
+        return {"FINISHED"}
+   
+        
+def register():
+    bpy.utils.register_class(OT_MESH_CUBETOWER)
+def unregister():
+    bpy.utils.uznregister_class(OT_MESH_CUBETOWER)
+    
+    
+if __name__ == "__main__":
+    register()
