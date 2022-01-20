@@ -25,13 +25,13 @@ print(" ------- ")
 
 minBranchLength: float = 0.02
 
-maxIteration: int = 11
+maxIteration: int = 10
 
 lengthDivider: float = 1
 lengthDividerIterationMultiplicator: float = 1.2
 
 lengthStandardDerivationFactor: float = 0.4
-starAngleStandardDerivation: float = 80
+starAngleStandardDerivation: float = 0
 
 angle: float = 25  # 120
 
@@ -87,11 +87,11 @@ def getRodriguesMatrix(axisVector: mathutils.Vector, _angle: float):
         3) + math.sin(_angle) * w + (2 * math.sin(_angle/2)**2) * mathutils.Matrix(np.matmul(w, w))
 
 
-def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDeg: float, _lengthDivider: float):
+def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDegRodrigues: float, _lengthDivider: float):
 
     lastStarVecCopy: mathutils.Vector = _lastStarVec.copy()
     lastStarVecCopy.rotate(getRodriguesMatrix(
-        _normalizedOriginVector, math.radians(_angleDeg)))
+        _normalizedOriginVector, math.radians(_angleDegRodrigues)))
 
     lastStarVecCopy.normalize()
     lastStarVecCopy /= np.random.uniform(_lengthDivider -
