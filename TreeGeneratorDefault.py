@@ -28,14 +28,17 @@ minBranchLength: float = 0.02
 maxIteration: int = 10
 
 lengthDivider: float = 1
-lengthDividerIterationMultiplicator: float = 1.2
+lengthDividerIterationMultiplicator: float = 1.1
 
 lengthStandardDerivationFactor: float = 0.4
 starAngleStandardDerivation: float = 0
 
-angle: float = 25  # 120
+mainBranchAngle: float = 5  # 120
+mainBranchAngle *= 1 + (np.random.uniform(-1, 1) / 10000)
 
-angle *= 1 + (np.random.uniform(-1, 1) / 10000)
+secondBranchAdditionalAngle: float = 20  # 120
+secondBranchAdditionalAngle *= 1 + (np.random.uniform(-1, 1) / 10000)
+secondBranchLengthDividerDivider: float = 1
 
 truncVector: mathutils.Vector = mathutils.Vector((0.001, 0, 1))
 currentOriginVectorLength: float = truncVector.length
@@ -46,13 +49,13 @@ class Branch:
     vertex: BMVert
     branchVector: mathutils.Vector
     iteration: int
-    lengthDevider: float
+    lengthDivider: float
 
     def __init__(self, vertex, branchVector, iteration, lengthDevider):
         self.vertex = vertex
         self.branchVector = branchVector
         self.iteration = iteration
-        self.lengthDevider = lengthDevider
+        self.lengthDivider = lengthDevider
 
     def fork(self):
 
@@ -60,23 +63,26 @@ class Branch:
             return
 
         firstStarVert: BMVert = getExtrudedFirstStarVert(
-            self.vertex, self.branchVector.copy(), truncVector, self.lengthDevider)
+            self.vertex, self.branchVector.copy(), truncVector, self.lengthDivider)
 
         firstStarVec: mathutils.Vector = firstStarVert.co - self.vertex.co
 
         branch1: Branch = Branch(
-            firstStarVert, firstStarVec, self.iteration + 1, self.lengthDevider * lengthDividerIterationMultiplicator)
+            firstStarVert, firstStarVec, self.iteration + 1, self.lengthDivider * lengthDividerIterationMultiplicator)
         branch1.fork()
 
         randomStarAngle: float = np.random.uniform(
             180 - starAngleStandardDerivation, 180 + starAngleStandardDerivation)
 
+        shortenedLengthDivider: float = self.lengthDivider / \
+            secondBranchLengthDividerDivider
+
         secondStarVert: BMVert = getExtrudedRotatedStarVertex(
-            self.vertex, firstStarVec, self.branchVector.normalized(), randomStarAngle,  self.lengthDevider)
+            self.vertex, firstStarVec, self.branchVector.normalized(), randomStarAngle,  shortenedLengthDivider)
         secondStarVec: mathutils.Vector = secondStarVert.co - self.vertex.co
 
         branch2: Branch = Branch(
-            secondStarVert, secondStarVec, self.iteration + 1, self.lengthDevider * lengthDividerIterationMultiplicator)
+            secondStarVert, secondStarVec, self.iteration + 1, shortenedLengthDivider * lengthDividerIterationMultiplicator)
         branch2.fork()
 
 
@@ -90,6 +96,7 @@ def getRodriguesMatrix(axisVector: mathutils.Vector, _angle: float):
 def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDegRodrigues: float, _lengthDivider: float):
 
     lastStarVecCopy: mathutils.Vector = _lastStarVec.copy()
+
     lastStarVecCopy.rotate(getRodriguesMatrix(
         _normalizedOriginVector, math.radians(_angleDegRodrigues)))
 
@@ -97,9 +104,18 @@ def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Ve
     lastStarVecCopy /= np.random.uniform(_lengthDivider -
                                          _lengthDivider * lengthStandardDerivationFactor, _lengthDivider + _lengthDivider * lengthStandardDerivationFactor)
 
+    # rotate further apart from main Branch
+
+    crossedLastVector: mathutils.Vector = _normalizedOriginVector.cross(
+        lastStarVecCopy).normalized()
+
+    lastStarVecCopy.rotate(getRodriguesMatrix(
+        crossedLastVector, math.radians(secondBranchAdditionalAngle)))
+
     outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
         treeMesh, verts=[_centerVert])['verts'][0]
     outputVert.co += lastStarVecCopy
+
     return outputVert
 
 
@@ -111,7 +127,7 @@ def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vecto
     crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
     rotatedOriginVector: mathutils.Vector = _originVector.copy()
     rotatedOriginVector.rotate(getRodriguesMatrix(
-        crossedZVector, math.radians(angle)))
+        crossedZVector, math.radians(mainBranchAngle)))
 
     rotatedOriginVector.rotate(getRodriguesMatrix(
         _originVector.normalized(), math.radians(np.random.uniform(0, 360))))
@@ -187,7 +203,7 @@ branch2.fork()
 
 # starVert4: BMVert = bmesh.ops.extrude_vert_indiv(
 # treeMesh, verts=[centerVert])['verts'][0]
-#starVert4.co += scaledTruncVector
+# starVert4.co += scaledTruncVector
 
 
 treeMesh.to_mesh(mesh)
