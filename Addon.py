@@ -247,7 +247,7 @@ class SimpleOperator(bpy.types.Operator):
         min = 3,
         max = 15)          
 
-    def execute(self):
+    def execute(self, execute):
         main(self)
         return {'FINISHED'}
 
