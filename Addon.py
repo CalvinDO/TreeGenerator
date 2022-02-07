@@ -1,3 +1,16 @@
+bl_info = {
+    "name": "Tree Generator",
+    "author": "Your Name Here",
+    "version": (1, 0),
+    "blender": (2, 80, 0),
+    "location": "View3D > Add > Mesh > Tree Generator",
+    "description": "Adds a new Tree",
+    "warning": "",
+    "doc_url": "",
+    "category": "Add Mesh",
+}
+
+
 from random import random
 from bmesh.types import BMVert, BMesh
 import bpy
@@ -10,13 +23,12 @@ from numpy.core.numeric import cross, outer
 
 
 def main(varFromOperator):
-   
+
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     "Copy your Code here"
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 ####################################################################################################################################
@@ -35,20 +47,17 @@ def main(varFromOperator):
     treeObject: Object = bpy.data.objects.new("tree object", mesh)
     bpy.context.collection.objects.link(treeObject)
 
-
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
     print(" ------- ")
 
-    minBranchLength: float = varFromOperator.minBranchLength
-
     maxIteration: int = varFromOperator.maxIteration
 
-    lengthDivider: float = 1
-    lengthDividerIterationMultiplicator: float = 1.2
+    lengthDivider: float = varFromOperator.lengthDevider
+    lengthDividerIterationMultiplicator: float = varFromOperator.lengthDividerIterationMultiplicator
 
-    lengthStandardDerivationFactor: float = 0.4
+    lengthStandardDerivationFactor: float = varFromOperator.lengthStandardDerivationFactor
     starAngleStandardDerivation: float = 0
 
     angle: float = varFromOperator.angle  # 120
@@ -57,7 +66,6 @@ def main(varFromOperator):
 
     truncVector: mathutils.Vector = mathutils.Vector((0.001, 0, 1))
     currentOriginVectorLength: float = truncVector.length
-
 
     class Branch:
 
@@ -97,13 +105,11 @@ def main(varFromOperator):
                 secondStarVert, secondStarVec, self.iteration + 1, self.lengthDevider * lengthDividerIterationMultiplicator)
             branch2.fork()
 
-
     def getRodriguesMatrix(axisVector: mathutils.Vector, _angle: float):
         w: mathutils.Matrix = mathutils.Matrix(
             ((0, - axisVector.z,  axisVector.y), (axisVector.z, 0, - axisVector.x), (- axisVector.y,  axisVector.x, 0)))
         return mathutils.Matrix.Identity(
             3) + math.sin(_angle) * w + (2 * math.sin(_angle/2)**2) * mathutils.Matrix(np.matmul(w, w))
-
 
     def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDegRodrigues: float, _lengthDivider: float):
 
@@ -120,13 +126,13 @@ def main(varFromOperator):
         outputVert.co += lastStarVecCopy
         return outputVert
 
-
     def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector, _lengthDivider):
 
         _originVector /= np.random.uniform(_lengthDivider -
                                            lengthStandardDerivationFactor, _lengthDivider + lengthStandardDerivationFactor)
 
-        crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
+        crossedZVector: mathutils.Vector = _originVector.cross(
+            _trunc).normalized()
         rotatedOriginVector: mathutils.Vector = _originVector.copy()
         rotatedOriginVector.rotate(getRodriguesMatrix(
             crossedZVector, math.radians(angle)))
@@ -155,29 +161,24 @@ def main(varFromOperator):
 
         return firstStarVert
 
-
     def randomizeVector(vector: mathutils.Vector):
         vector.x *= 1 + \
             (np.random.uniform(-1, 1) / (10000 * vector.magnitude))
         vector.y *= 1 + \
             (np.random.uniform(-1, 1) / (10000 * vector.magnitude))
 
-
     scaledTruncVector = truncVector.copy()
     scaledTruncVector /= lengthDivider
 
     randomizeVector(scaledTruncVector)
 
-
     # initial branches
 
     firstVertex: BMVert = treeMesh.verts.new((0, 0, 0))
 
-
     centerVert: BMVert = bmesh.ops.extrude_vert_indiv(
         treeMesh, verts=[firstVertex])['verts'][0]
     centerVert.co = truncVector
-
 
     starVert1: BMVert = getExtrudedFirstStarVert(
         centerVert, truncVector, mathutils.Vector((1, 0, 0)), lengthDivider)
@@ -186,7 +187,6 @@ def main(varFromOperator):
 
     branch1: Branch = Branch(starVert1, starVec1, 1, lengthDivider)
     branch1.fork()
-
 
     randomStarAngle: float = np.random.uniform(
         180 - starAngleStandardDerivation, 180 + starAngleStandardDerivation)
@@ -199,14 +199,12 @@ def main(varFromOperator):
     branch2: Branch = Branch(starVert2, starVec2, 1, lengthDivider)
     branch2.fork()
 
-
     # starVert3 = getExtrudedRotatedStarVertex(
     # centerVert, starVec1, truncVector.normalized(), 360 / 3 * 2)
 
     # starVert4: BMVert = bmesh.ops.extrude_vert_indiv(
     # treeMesh, verts=[centerVert])['verts'][0]
-    #starVert4.co += scaledTruncVector
-
+    # starVert4.co += scaledTruncVector
 
     treeMesh.to_mesh(mesh)
     treeMesh.free()
@@ -226,35 +224,66 @@ class SimpleOperator(bpy.types.Operator):
     bl_label = "Generate Tree"
     bl_options = {"REGISTER", "UNDO"}
 
+    Baumarten: bpy.props.EnumProperty(
+        items=(
+            ('Tree1', "Laubbaum", ""),
+            ('Tree2', "Tannenbaum", "")
+        ),
+        default='Tree1'
+    )
+
     angle: bpy.props.FloatProperty(
         name='Winkel',
         description='XYZ',
-        default = 25,
-        min = 1,
-        max = 100)
+        default=25,
+        min=10,
+        max=35)
 
-    minBranchLength: bpy.props.FloatProperty(
-        name='kleinste Länge der Äste',
+    maxIteration: bpy.props.IntProperty(
+        name='Ast-Abspaltungen',
         description='XYZ',
-        default = 0.02,
-        min = 0.01,
-        max = 0.5)
+        default=7,
+        min=3,
+        max=12)
 
-    maxIteration: bpy.props.FloatProperty(
-        name='maximale Anzahl der Ast-Abspaltungen',
+    subdivViewportRes: bpy.props.IntProperty(
+        name='Viewport Auflösung',
+        description='Noch keine Funktion',
+        default=7,
+        min=3,
+        max=12)
+
+    lengthDevider: bpy.props.FloatProperty(
+        name='Astverkürzung',
         description='XYZ',
-        default = 10,
-        min = 3,
-        max = 15)          
+        default=1,
+        min=0.6,
+        max=1.7)
+
+    lengthStandardDerivationFactor: bpy.props.FloatProperty(
+        name='Astverkürzung Zufallsabweichung',
+        description='XYZ',
+        default=0.4,
+        min=0.1,
+        max=0.85)
+
+
+    lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
+        name='lengthDividerIterationMultiplicator',
+        description='relative Astverkürzung',
+        default=1.2,
+        min=1,
+        max=1.9)
+
+
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
 
     def execute(self, execute):
         main(self)
         return {'FINISHED'}
-
-
-
-
-
 
 
 class LayoutDemoPanel(bpy.types.Panel):
@@ -275,7 +304,6 @@ class LayoutDemoPanel(bpy.types.Panel):
         row = layout.row()
         row.scale_y = 3.0
         row.operator("object.simple_operator")
-
 
 
 def register():
