@@ -1,3 +1,13 @@
+from numpy.core.numeric import cross, outer
+import numpy as np
+import mathutils
+from bpy.types import Mesh, Object
+import math
+import bmesh
+import bpy
+from bmesh.types import BMVert, BMesh
+from random import random
+
 bl_info = {
     "name": "Tree Generator",
     "author": "Your Name Here",
@@ -9,17 +19,6 @@ bl_info = {
     "doc_url": "",
     "category": "Add Mesh",
 }
-
-
-from random import random
-from bmesh.types import BMVert, BMesh
-import bpy
-import bmesh
-import math
-from bpy.types import Mesh, Object
-import mathutils
-import numpy as np
-from numpy.core.numeric import cross, outer
 
 
 def main(varFromOperator):
@@ -50,6 +49,11 @@ def main(varFromOperator):
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
+    # skin modifier
+    def map_range(v, from_min, from_max, to_min, to_max):
+        """Bringt einen Wert v von einer Skala (from_min, from_max) auf eine neue Skala (to_min, to_max)"""
+        return to_min + (v - from_min) * (to_max - to_min) / (from_max - from_min)
+
     print(" ------- ")
 
     maxIteration: int = varFromOperator.maxIteration
@@ -67,6 +71,20 @@ def main(varFromOperator):
     truncVector: mathutils.Vector = mathutils.Vector((0.001, 0, 1))
     currentOriginVectorLength: float = truncVector.length
 
+    treeMesh.to_mesh(mesh)
+
+    import array
+
+    vertexIndices = [0] * (4 + 2 ** maxIteration)
+    vertexIteration = [0] * (4 + 2 ** maxIteration)
+
+    currentVertexIndex: int
+
+    def setVertexIterationData(index, iteration):
+        vertexIndices[currentVertexIndex] = index
+
+        vertexIteration[currentVertexIndex] = iteration
+
     class Branch:
 
         vertex: BMVert
@@ -81,6 +99,10 @@ def main(varFromOperator):
             self.lengthDevider = lengthDevider
 
         def fork(self):
+
+            vertexIndices[currentVertexIndex] = self.vertex.index
+
+            vertexIteration[currentVertexIndex] = self.iteration
 
             if self.iteration > maxIteration:
                 return
@@ -185,6 +207,8 @@ def main(varFromOperator):
 
     starVec1: mathutils.Vector = starVert1.co - centerVert.co
 
+    currentVertexIndex = 0
+
     branch1: Branch = Branch(starVert1, starVec1, 1, lengthDivider)
     branch1.fork()
 
@@ -207,6 +231,24 @@ def main(varFromOperator):
     # starVert4.co += scaledTruncVector
 
     treeMesh.to_mesh(mesh)
+
+    my_skinmod: bpy.types.SkinModifier = treeObject.modifiers.new(
+        "my skin mod", type="SKIN")
+
+    my_skinmod.branch_smoothing = 0.4
+    my_skinmod.use_smooth_shade = True
+    my_skinmod.use_x_symmetry = False
+
+    my_subdiv_mod: bpy.types.SubsurfModifier = treeObject.modifiers.new(
+        "my subdiv mod", type="SUBSURF")
+    my_subdiv_mod.levels = 2
+    my_subdiv_mod.render_levels = 2
+
+    for i, v in enumerate(mesh.vertices):
+        height = v.co.z
+        radius = map_range(height, -1, 5, 0.5, 0.05)
+        mesh.skin_vertices[0].data[i].radius = radius, radius
+
     treeMesh.free()
 
 
@@ -267,15 +309,12 @@ class SimpleOperator(bpy.types.Operator):
         min=0.1,
         max=0.85)
 
-
     lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
         name='lengthDividerIterationMultiplicator',
         description='relative Astverkürzung',
         default=1.2,
         min=1,
         max=1.9)
-
-
 
     def invoke(self, context, event):
         wm = context.window_manager
