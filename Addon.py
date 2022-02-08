@@ -1,3 +1,4 @@
+from re import search
 from numpy.core.numeric import cross, outer
 import numpy as np
 import mathutils
@@ -64,6 +65,10 @@ def main(varFromOperator):
     lengthStandardDerivationFactor: float = varFromOperator.lengthStandardDerivationFactor
     starAngleStandardDerivation: float = 0
 
+    radiusReductionAcceleration: float = varFromOperator.radiusReductionAcceleration
+
+    radiusGeneralThickness: float = varFromOperator.radiusGeneralThickness
+
     angle: float = varFromOperator.angle  # 120
 
     angle *= 1 + (np.random.uniform(-1, 1) / 10000)
@@ -75,15 +80,9 @@ def main(varFromOperator):
 
     import array
 
-    vertexIndices = [0] * (4 + 2 ** maxIteration)
-    vertexIteration = [0] * (4 + 2 ** maxIteration)
-
-    currentVertexIndex: int
-
-    def setVertexIterationData(index, iteration):
-        vertexIndices[currentVertexIndex] = index
-
-        vertexIteration[currentVertexIndex] = iteration
+    vertexIndices = [0] * (2 ** (maxIteration + 2))
+    vertexIterations = [0] * (2 ** (maxIteration + 2))
+    vertexPositions = [mathutils.Vector.zero] * (2 ** (maxIteration + 2))
 
     class Branch:
 
@@ -91,6 +90,7 @@ def main(varFromOperator):
         branchVector: mathutils.Vector
         iteration: int
         lengthDevider: float
+        currentVertexIndex: int = 0
 
         def __init__(self, vertex, branchVector, iteration, lengthDevider):
             self.vertex = vertex
@@ -98,11 +98,12 @@ def main(varFromOperator):
             self.iteration = iteration
             self.lengthDevider = lengthDevider
 
+            vertexIndices[Branch.currentVertexIndex] = self.vertex.index
+            vertexIterations[Branch.currentVertexIndex] = self.iteration
+            vertexPositions[Branch.currentVertexIndex] = self.vertex.co
+            Branch.currentVertexIndex += 1
+
         def fork(self):
-
-            vertexIndices[currentVertexIndex] = self.vertex.index
-
-            vertexIteration[currentVertexIndex] = self.iteration
 
             if self.iteration > maxIteration:
                 return
@@ -198,16 +199,18 @@ def main(varFromOperator):
 
     firstVertex: BMVert = treeMesh.verts.new((0, 0, 0))
 
+    Branch.currentVertexIndex += 1
+
     centerVert: BMVert = bmesh.ops.extrude_vert_indiv(
         treeMesh, verts=[firstVertex])['verts'][0]
     centerVert.co = truncVector
+
+    Branch.currentVertexIndex += 1
 
     starVert1: BMVert = getExtrudedFirstStarVert(
         centerVert, truncVector, mathutils.Vector((1, 0, 0)), lengthDivider)
 
     starVec1: mathutils.Vector = starVert1.co - centerVert.co
-
-    currentVertexIndex = 0
 
     branch1: Branch = Branch(starVert1, starVec1, 1, lengthDivider)
     branch1.fork()
@@ -232,6 +235,8 @@ def main(varFromOperator):
 
     treeMesh.to_mesh(mesh)
 
+    # skin modifier:
+
     my_skinmod: bpy.types.SkinModifier = treeObject.modifiers.new(
         "my skin mod", type="SKIN")
 
@@ -241,13 +246,36 @@ def main(varFromOperator):
 
     my_subdiv_mod: bpy.types.SubsurfModifier = treeObject.modifiers.new(
         "my subdiv mod", type="SUBSURF")
-    my_subdiv_mod.levels = 2
-    my_subdiv_mod.render_levels = 2
+    my_subdiv_mod.levels = 1
+    my_subdiv_mod.render_levels = 1
 
-    for i, v in enumerate(mesh.vertices):
-        height = v.co.z
-        radius = map_range(height, -1, 5, 0.5, 0.05)
-        mesh.skin_vertices[0].data[i].radius = radius, radius
+    correctOrderVertexIndices = [0] * (2 ** (maxIteration + 2))
+
+    for vertexIndex in range(len(vertexIndices)):
+
+        vertexIteration = vertexIterations[vertexIndex]
+        print(vertexIteration)
+        radius = (1 / (lengthDivider *
+                       lengthDividerIterationMultiplicator)) ** (vertexIteration * radiusReductionAcceleration)
+
+        radius *= radiusGeneralThickness
+
+        #radius = vertexIteration / 10
+
+        searchedPos = mesh.vertices[vertexIndex].co
+        correctPosIndex = 91919191
+
+        for index, vertex in enumerate(mesh.vertices):
+            if vertex.co == searchedPos:
+                correctPosIndex = vertex.index
+                print(mesh.vertices[vertex.index].co, mesh.vertices[index].co)
+
+        correctOrderVertexIndices[vertexIndex] = correctPosIndex
+        mesh.skin_vertices[0].data[correctOrderVertexIndices[vertexIndex]
+                                   ].radius = radius, radius
+
+        print("vertex data->    index: ", vertexIndices[vertexIndex], "||| correct order index: ", correctOrderVertexIndices[vertexIndex], "||| iteration: ", vertexIterations[vertexIndex], "||| position: ",
+              vertexPositions[correctOrderVertexIndices[vertexIndex]], "||| realPosition: ", mesh.vertices[vertexIndex].co, "||| skinRadius: ", mesh.skin_vertices[0].data[vertexIndex].radius[:])
 
     treeMesh.free()
 
@@ -301,6 +329,20 @@ class SimpleOperator(bpy.types.Operator):
         default=1,
         min=0.6,
         max=1.7)
+
+    radiusReductionAcceleration: bpy.props.FloatProperty(
+        name='RadiusVerkürzung',
+        description='XYZ',
+        default=3,
+        min=1,
+        max=5)
+
+    radiusGeneralThickness: bpy.props.FloatProperty(
+        name='Radius',
+        description='XYZ',
+        default=0.5,
+        min=0.1,
+        max=1)
 
     lengthStandardDerivationFactor: bpy.props.FloatProperty(
         name='Astverkürzung Zufallsabweichung',
