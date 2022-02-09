@@ -27,15 +27,18 @@ def main(context):
 
     minBranchLength: float = 0.02
 
-    maxIteration: int = 10
+lengthDivider: float = 1
+lengthDividerIterationMultiplicator: float = 1.1
 
     lengthDivider: float = 1
     lengthDividerIterationMultiplicator: float = 1.2
 
-    lengthStandardDerivationFactor: float = 0.4
-    starAngleStandardDerivation: float = 0
+mainBranchAngle: float = 5  # 120
+mainBranchAngle *= 1 + (np.random.uniform(-1, 1) / 10000)
 
-    angle: float = 25  # 120
+secondBranchAdditionalAngle: float = 20  # 120
+secondBranchAdditionalAngle *= 1 + (np.random.uniform(-1, 1) / 10000)
+secondBranchLengthDividerDivider: float = 1
 
     angle *= 1 + (np.random.uniform(-1, 1) / 10000)
 
@@ -43,12 +46,16 @@ def main(context):
     currentOriginVectorLength: float = truncVector.length
 
 
-    class Branch:
+    vertex: BMVert
+    branchVector: mathutils.Vector
+    iteration: int
+    lengthDivider: float
 
-        vertex: BMVert
-        branchVector: mathutils.Vector
-        iteration: int
-        lengthDevider: float
+    def __init__(self, vertex, branchVector, iteration, lengthDevider):
+        self.vertex = vertex
+        self.branchVector = branchVector
+        self.iteration = iteration
+        self.lengthDivider = lengthDevider
 
         def __init__(self, vertex, branchVector, iteration, lengthDevider):
             self.vertex = vertex
@@ -58,24 +65,30 @@ def main(context):
 
         def fork(self):
 
-            if self.iteration > maxIteration:
-                return
+        firstStarVert: BMVert = getExtrudedFirstStarVert(
+            self.vertex, self.branchVector.copy(), truncVector, self.lengthDivider)
 
             firstStarVert: BMVert = getExtrudedFirstStarVert(
                 self.vertex, self.branchVector.copy(), truncVector, self.lengthDevider)
 
-            firstStarVec: mathutils.Vector = firstStarVert.co - self.vertex.co
+        branch1: Branch = Branch(
+            firstStarVert, firstStarVec, self.iteration + 1, self.lengthDivider * lengthDividerIterationMultiplicator)
+        branch1.fork()
 
             branch1: Branch = Branch(
                 firstStarVert, firstStarVec, self.iteration + 1, self.lengthDevider * lengthDividerIterationMultiplicator)
             branch1.fork()
 
-            randomStarAngle: float = np.random.uniform(
-                180 - starAngleStandardDerivation, 180 + starAngleStandardDerivation)
+        shortenedLengthDivider: float = self.lengthDivider / \
+            secondBranchLengthDividerDivider
 
-            secondStarVert: BMVert = getExtrudedRotatedStarVertex(
-                self.vertex, firstStarVec, self.branchVector.normalized(), randomStarAngle,  self.lengthDevider)
-            secondStarVec: mathutils.Vector = secondStarVert.co - self.vertex.co
+        secondStarVert: BMVert = getExtrudedRotatedStarVertex(
+            self.vertex, firstStarVec, self.branchVector.normalized(), randomStarAngle,  shortenedLengthDivider)
+        secondStarVec: mathutils.Vector = secondStarVert.co - self.vertex.co
+
+        branch2: Branch = Branch(
+            secondStarVert, secondStarVec, self.iteration + 1, shortenedLengthDivider * lengthDividerIterationMultiplicator)
+        branch2.fork()
 
             branch2: Branch = Branch(
                 secondStarVert, secondStarVec, self.iteration + 1, self.lengthDevider * lengthDividerIterationMultiplicator)
@@ -89,15 +102,28 @@ def main(context):
             3) + math.sin(_angle) * w + (2 * math.sin(_angle/2)**2) * mathutils.Matrix(np.matmul(w, w))
 
 
-    def getExtrudedRotatedStarVertex(_centerVert: BMVert, _lastStarVec: mathutils.Vector, _normalizedOriginVector: mathutils.Vector, _angleDegRodrigues: float, _lengthDivider: float):
+    lastStarVecCopy: mathutils.Vector = _lastStarVec.copy()
+
+    lastStarVecCopy.rotate(getRodriguesMatrix(
+        _normalizedOriginVector, math.radians(_angleDegRodrigues)))
 
         lastStarVecCopy: mathutils.Vector = _lastStarVec.copy()
         lastStarVecCopy.rotate(getRodriguesMatrix(
             _normalizedOriginVector, math.radians(_angleDegRodrigues)))
 
-        lastStarVecCopy.normalize()
-        lastStarVecCopy /= np.random.uniform(_lengthDivider -
-                                             _lengthDivider * lengthStandardDerivationFactor, _lengthDivider + _lengthDivider * lengthStandardDerivationFactor)
+    # rotate further apart from main Branch
+
+    crossedLastVector: mathutils.Vector = _normalizedOriginVector.cross(
+        lastStarVecCopy).normalized()
+
+    lastStarVecCopy.rotate(getRodriguesMatrix(
+        crossedLastVector, math.radians(secondBranchAdditionalAngle)))
+
+    outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
+        treeMesh, verts=[_centerVert])['verts'][0]
+    outputVert.co += lastStarVecCopy
+
+    return outputVert
 
         outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[_centerVert])['verts'][0]
@@ -107,8 +133,10 @@ def main(context):
 
     def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector, _lengthDivider):
 
-        _originVector /= np.random.uniform(_lengthDivider -
-                                           lengthStandardDerivationFactor, _lengthDivider + lengthStandardDerivationFactor)
+    crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
+    rotatedOriginVector: mathutils.Vector = _originVector.copy()
+    rotatedOriginVector.rotate(getRodriguesMatrix(
+        crossedZVector, math.radians(mainBranchAngle)))
 
         crossedZVector: mathutils.Vector = _originVector.cross(_trunc).normalized()
         rotatedOriginVector: mathutils.Vector = _originVector.copy()
@@ -184,8 +212,9 @@ def main(context):
     branch2.fork()
 
 
-    # starVert3 = getExtrudedRotatedStarVertex(
-    # centerVert, starVec1, truncVector.normalized(), 360 / 3 * 2)
+# starVert4: BMVert = bmesh.ops.extrude_vert_indiv(
+# treeMesh, verts=[centerVert])['verts'][0]
+# starVert4.co += scaledTruncVector
 
     # starVert4: BMVert = bmesh.ops.extrude_vert_indiv(
     # treeMesh, verts=[centerVert])['verts'][0]
