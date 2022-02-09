@@ -144,7 +144,7 @@ def main(varFromOperator):
                 duplicatedLeaf.location = self.vertex.co
 
                 branchVectorRotation: mathutils.Quaternion = self.branchVector.to_track_quat(
-                    'X', 'Z')
+                    '-Y', 'Z')
 
                 branchVectorEuler: mathutils.Euler = branchVectorRotation.to_euler()
 
@@ -348,7 +348,7 @@ class SimpleOperator(bpy.types.Operator):
             ('testbranch', "testbranch", ""),
             ('pine_tree', "pine_tree", ""),
         ),
-        default='leaf1'
+        default='leaf 1'
     )
 
     angle: bpy.props.FloatProperty(
