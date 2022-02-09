@@ -38,19 +38,30 @@ def main(varFromOperator):
 ####################################################################################################################################
 ####################################################################################################################################
 
-    bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
+    # selektiert alle Objekte in Collection "Collection"
+    for obj in bpy.data.collections['TreeCollection'].all_objects:
+        obj.select_set(True)
+
+    for obj in bpy.data.collections['GeneratedLeafs'].all_objects:
+        obj.select_set(True)
+
+    for obj in bpy.data.collections['PrefabLeafs'].all_objects:
+        obj.select_set(False)
+
+    # bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
     # löscht selektierte objekte
     bpy.ops.object.delete(use_global=False, confirm=False)
     bpy.ops.outliner.orphans_purge()  # löscht überbleibende Meshdaten etc
 
     mesh: Mesh = bpy.data.meshes.new("tree mesh")
     treeObject: Object = bpy.data.objects.new("tree object", mesh)
-    bpy.context.collection.objects.link(treeObject)
+    bpy.data.collections['TreeCollection'].objects.link(treeObject)
 
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
-    # skin modifier
+    # old skin modifier
+
     def map_range(v, from_min, from_max, to_min, to_max):
         """Bringt einen Wert v von einer Skala (from_min, from_max) auf eine neue Skala (to_min, to_max)"""
         return to_min + (v - from_min) * (to_max - to_min) / (from_max - from_min)
@@ -69,6 +80,9 @@ def main(varFromOperator):
 
     radiusGeneralThickness: float = varFromOperator.radiusGeneralThickness
 
+    treeType = varFromOperator.Baumarten
+    print(treeType)
+
     angle: float = varFromOperator.angle  # 120
 
     angle *= 1 + (np.random.uniform(-1, 1) / 10000)
@@ -83,6 +97,25 @@ def main(varFromOperator):
     vertexIndices = [0] * (2 ** (maxIteration + 2))
     vertexIterations = [0] * (2 ** (maxIteration + 2))
     vertexPositions = [mathutils.Vector.zero] * (2 ** (maxIteration + 2))
+
+    # leafs:
+
+    leafObject: Object = bpy.data.objects[treeType]
+    leafObject.select_set(True)
+    loc = leafObject.matrix_world.to_translation()
+    print(loc)
+
+    def duplicate(obj: Object, collection=None):
+
+        obj_copy: Object = obj.copy()
+        obj_copy.data = obj_copy.data.copy()
+
+        if obj_copy.animation_data:
+            obj_copy.animation_data.action = obj_copy.animation_data.action.copy()
+
+        collection.objects.link(obj_copy)
+
+        return obj_copy
 
     class Branch:
 
@@ -106,6 +139,17 @@ def main(varFromOperator):
         def fork(self):
 
             if self.iteration > maxIteration:
+                duplicatedLeaf: Object = duplicate(
+                    leafObject, collection=bpy.data.collections['GeneratedLeafs'])
+                duplicatedLeaf.location = self.vertex.co
+
+                branchVectorRotation: mathutils.Quaternion = self.branchVector.to_track_quat(
+                    'X', 'Z')
+
+                branchVectorEuler: mathutils.Euler = branchVectorRotation.to_euler()
+
+                duplicatedLeaf.rotation_euler = branchVectorEuler
+
                 return
 
             firstStarVert: BMVert = getExtrudedFirstStarVert(
@@ -254,7 +298,6 @@ def main(varFromOperator):
     for vertexIndex in range(len(vertexIndices)):
 
         vertexIteration = vertexIterations[vertexIndex]
-        print(vertexIteration)
         radius = (1 / (lengthDivider *
                        lengthDividerIterationMultiplicator)) ** (vertexIteration * radiusReductionAcceleration)
 
@@ -268,14 +311,10 @@ def main(varFromOperator):
         for index, vertex in enumerate(mesh.vertices):
             if vertex.co == searchedPos:
                 correctPosIndex = vertex.index
-                print(mesh.vertices[vertex.index].co, mesh.vertices[index].co)
 
         correctOrderVertexIndices[vertexIndex] = correctPosIndex
         mesh.skin_vertices[0].data[correctOrderVertexIndices[vertexIndex]
                                    ].radius = radius, radius
-
-        print("vertex data->    index: ", vertexIndices[vertexIndex], "||| correct order index: ", correctOrderVertexIndices[vertexIndex], "||| iteration: ", vertexIterations[vertexIndex], "||| position: ",
-              vertexPositions[correctOrderVertexIndices[vertexIndex]], "||| realPosition: ", mesh.vertices[vertexIndex].co, "||| skinRadius: ", mesh.skin_vertices[0].data[vertexIndex].radius[:])
 
     treeMesh.free()
 
@@ -296,10 +335,20 @@ class SimpleOperator(bpy.types.Operator):
 
     Baumarten: bpy.props.EnumProperty(
         items=(
-            ('Tree1', "Laubbaum", ""),
-            ('Tree2', "Tannenbaum", "")
+            ('leaf1', "leaf1", ""),
+            ('leaf2', "leaf2", ""),
+            ('leaf3', "leaf3", ""),
+            ('leaf4', "leaf4", ""),
+            ('leaf5', "leaf5", ""),
+            ('leaf6', "leaf6", ""),
+            ('leaf7', "leaf7", ""),
+            ('leaf8', "leaf8", ""),
+            ('leaf9', "leaf9", ""),
+            ('leaf10', "leaf10", ""),
+            ('testbranch', "testbranch", ""),
+            ('pine_tree', "pine_tree", ""),
         ),
-        default='Tree1'
+        default='leaf1'
     )
 
     angle: bpy.props.FloatProperty(
