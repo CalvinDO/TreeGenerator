@@ -1,4 +1,4 @@
-from re import search
+from re import S, search
 from numpy.core.numeric import cross, outer
 import numpy as np
 import mathutils
@@ -92,6 +92,9 @@ def main(varFromOperator):
 
     generateLeafs: bool = varFromOperator.generateLeafs
 
+    sunOptimizationFactor: float = varFromOperator.sunOptimizationFactor
+    spaceOptimizationFactor: float = varFromOperator.spaceOptimizationFactor
+
     angle: float = varFromOperator.angle  # 120
 
     angle *= 1 + (np.random.uniform(-1, 1) / 10000)
@@ -112,7 +115,6 @@ def main(varFromOperator):
     leafObject: Object = bpy.data.objects[treeType]
     leafObject.select_set(True)
     loc = leafObject.matrix_world.to_translation()
-    print(loc)
 
     sunVector: mathutils.Vector = ((0, 0, 1))
 
@@ -146,10 +148,11 @@ def main(varFromOperator):
             vertexIndices[Branch.currentVertexIndex] = self.vertex.index
             vertexIterations[Branch.currentVertexIndex] = self.iteration
             vertexPositions[Branch.currentVertexIndex] = self.vertex.co
+
             Branch.currentVertexIndex += 1
 
-            # Branch.positionSumVector += mathutils.Vector(
-            #    (self.branchVector.x, self.branchVector.y, 0))
+            Branch.positionSumVector += mathutils.Vector(
+                (self.vertex.co.x, self.vertex.co.y, 0))
 
         def fork(self):
 
@@ -210,11 +213,33 @@ def main(varFromOperator):
         outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[_centerVert])['verts'][0]
 
-        # grow to sun
-        sunAnglePercentage: float = lastStarVecCopy.angle(sunVector) / 180
-        illuminationBoostFactor: float = np.clip(1 - sunAnglePercentage, 0, 1)
+        illuminationBoostFactor: float = 1
+        spaceBoostFactor: float = 1
 
-        outputVert.co += (lastStarVecCopy * illuminationBoostFactor)
+        if lastStarVecCopy.length > 0:
+
+            # grow to sun
+            sunAnglePercentage: float = lastStarVecCopy.angle(sunVector) / 180
+            sunAnglePercentage *= sunOptimizationFactor
+            illuminationBoostFactor = np.clip(1 - sunAnglePercentage, 0, 1)
+
+            # grow to free space
+
+            if Branch.currentVertexIndex > 3:
+                print(Branch.currentVertexIndex)
+
+                currentNegatedSumVector: mathutils.Vector = - Branch.positionSumVector
+                currentDirectionXY: mathutils.Vector = mathutils.Vector(
+                    (lastStarVecCopy.x, lastStarVecCopy.y, 0))
+                spaceAnglePercentage: float = currentDirectionXY.angle(
+                    currentNegatedSumVector) / 180
+                spaceAnglePercentage *= spaceBoostFactor
+                spaceBoostFactor = np.clip(1 - spaceAnglePercentage, 0.02, 1)
+
+        print(spaceBoostFactor)
+        outputVert.co += (lastStarVecCopy *
+                          (illuminationBoostFactor * spaceBoostFactor))
+        print("ill * space ", illuminationBoostFactor * spaceBoostFactor)
         return outputVert
 
     def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector, _lengthDivider):
@@ -235,11 +260,37 @@ def main(varFromOperator):
         firstStarVert: BMVert = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[_centerVert])['verts'][0]
 
-        # grow to sun
-        sunAnglePercentage: float = rotatedOriginVector.angle(sunVector) / 180
-        illuminationBoostFactor: float = np.clip(1 - sunAnglePercentage, 0, 1)
-        firstStarVert.co += (rotatedOriginVector * illuminationBoostFactor)
+        illuminationBoostFactor: float = 1
+        spaceBoostFactor: float = 1
 
+        if rotatedOriginVector.length > 0:
+
+            # grow to sun
+            sunAnglePercentage: float = rotatedOriginVector.angle(
+                sunVector) / (math.pi / 2)
+
+            sunAnglePercentage *= sunOptimizationFactor
+            illuminationBoostFactor = np.clip(
+                1 - sunAnglePercentage, 0.25, 1)
+
+            # grow to free space
+            if Branch.currentVertexIndex > 3:
+                currentNegatedSumVector: mathutils.Vector = - Branch.positionSumVector
+                currentDirectionXY: mathutils.Vector = mathutils.Vector(
+                    (rotatedOriginVector.x, rotatedOriginVector.y, 0))
+                currentDirectionXY.normalize()
+
+                print(Branch.currentVertexIndex)
+
+                spaceAnglePercentage: float = currentDirectionXY.angle(
+                    currentNegatedSumVector) / (math.pi / 2)
+                spaceAnglePercentage *= spaceBoostFactor
+                spaceBoostFactor = np.clip(1 - spaceAnglePercentage, 0.02, 1)
+
+        print("ill * space ", illuminationBoostFactor * spaceBoostFactor)
+
+        firstStarVert.co += (rotatedOriginVector *
+                             (illuminationBoostFactor * spaceBoostFactor))
         # crossedZVector *= _originVector.magnitude
 
         # rotatedOriginVector.rotate(getRodriguesMatrix(
@@ -420,12 +471,26 @@ class SimpleOperator(bpy.types.Operator):
         min=0.1,
         max=0.85)
 
+    spaceOptimizationFactor: bpy.props.FloatProperty(
+        name='Platzoptimierung',
+        description='Platzoptimierung',
+        default=0.5,
+        min=0,
+        max=1)
+
+    sunOptimizationFactor: bpy.props.FloatProperty(
+        name='Sonnenoptimierung',
+        description='Sonnenoptimierung',
+        default=0.5,
+        min=0,
+        max=1)
+
     radiusReductionAcceleration: bpy.props.FloatProperty(
-        name='RadiusVerkürzung',
+        name='Radius Verkürzung',
         description='XYZ',
         default=3,
-        min=1,
-        max=5)
+        min=0,
+        max=1)
 
     radiusGeneralThickness: bpy.props.FloatProperty(
         name='Radius',
