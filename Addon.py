@@ -47,6 +47,7 @@ def main(varFromOperator):
 
     for obj in bpy.data.collections['PrefabLeafs'].all_objects:
         obj.select_set(False)
+        obj.hide_set(False)
 
     for obj in bpy.data.collections['LightAndCam'].all_objects:
         obj.select_set(False)
@@ -399,7 +400,8 @@ def main(varFromOperator):
     for col in bpy.data.collections:
         for obj in col.all_objects:
             obj.select_set(False)
-
+    for obj in bpy.data.collections['PrefabLeafs'].all_objects:
+        obj.hide_set(True)
 ####################################################################################################################################
 ####################################################################################################################################
 ################################DEMO###############################################################################################
@@ -434,7 +436,7 @@ class SimpleOperator(bpy.types.Operator):
         description='XYZ',
         default=25,
         min=10,
-        max=35)
+        max=45)
 
     maxIteration: bpy.props.IntProperty(
         name='Ast-Abspaltungen',
@@ -481,9 +483,9 @@ class SimpleOperator(bpy.types.Operator):
     radiusReductionAcceleration: bpy.props.FloatProperty(
         name='Radius Verkürzung',
         description='XYZ',
-        default=3,
-        min=0,
-        max=1)
+        default=2.5,
+        min=0.5,
+        max=4)
 
     radiusGeneralThickness: bpy.props.FloatProperty(
         name='Radius',
