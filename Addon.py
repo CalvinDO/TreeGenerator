@@ -48,6 +48,9 @@ def main(varFromOperator):
     for obj in bpy.data.collections['PrefabLeafs'].all_objects:
         obj.select_set(False)
 
+    for obj in bpy.data.collections['LightAndCam'].all_objects:
+        obj.select_set(False)
+
     # bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
     # löscht selektierte objekte
     bpy.ops.object.delete(use_global=False, confirm=False)
@@ -74,7 +77,7 @@ def main(varFromOperator):
     lengthDividerIterationMultiplicator: float = varFromOperator.lengthDividerIterationMultiplicator
 
     lengthStandardDerivationFactor: float = varFromOperator.lengthStandardDerivationFactor
-    starAngleStandardDerivation: float = 0
+    starAngleStandardDerivation: float = 45
 
     radiusReductionAcceleration: float = varFromOperator.radiusReductionAcceleration
 
@@ -82,6 +85,8 @@ def main(varFromOperator):
 
     treeType = varFromOperator.Baumarten
     print(treeType)
+
+    generateLeafs: bool = varFromOperator.generateLeafs
 
     angle: float = varFromOperator.angle  # 120
 
@@ -104,6 +109,8 @@ def main(varFromOperator):
     leafObject.select_set(True)
     loc = leafObject.matrix_world.to_translation()
     print(loc)
+
+    sunVector: mathutils.Vector = ((0, 0, 1))
 
     def duplicate(obj: Object, collection=None):
 
@@ -139,6 +146,10 @@ def main(varFromOperator):
         def fork(self):
 
             if self.iteration > maxIteration:
+
+                if not generateLeafs:
+                    return
+
                 duplicatedLeaf: Object = duplicate(
                     leafObject, collection=bpy.data.collections['GeneratedLeafs'])
                 duplicatedLeaf.location = self.vertex.co
@@ -190,7 +201,12 @@ def main(varFromOperator):
 
         outputVert: BMVert = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[_centerVert])['verts'][0]
-        outputVert.co += lastStarVecCopy
+
+        # grow to sun
+        sunAnglePercentage: float = lastStarVecCopy.angle(sunVector) / 180
+        illuminationBoostFactor: float = np.clip(1 - sunAnglePercentage, 0, 1)
+
+        outputVert.co += (lastStarVecCopy * illuminationBoostFactor)
         return outputVert
 
     def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector, _lengthDivider):
@@ -199,7 +215,8 @@ def main(varFromOperator):
                                            lengthStandardDerivationFactor, _lengthDivider + lengthStandardDerivationFactor)
 
         crossedZVector: mathutils.Vector = _originVector.cross(
-            _trunc).normalized()
+            _trunc)
+        crossedZVector.normalize()
         rotatedOriginVector: mathutils.Vector = _originVector.copy()
         rotatedOriginVector.rotate(getRodriguesMatrix(
             crossedZVector, math.radians(angle)))
@@ -210,7 +227,10 @@ def main(varFromOperator):
         firstStarVert: BMVert = bmesh.ops.extrude_vert_indiv(
             treeMesh, verts=[_centerVert])['verts'][0]
 
-        firstStarVert.co += rotatedOriginVector
+        # grow to sun
+        sunAnglePercentage: float = rotatedOriginVector.angle(sunVector) / 180
+        illuminationBoostFactor: float = np.clip(1 - sunAnglePercentage, 0, 1)
+        firstStarVert.co += (rotatedOriginVector * illuminationBoostFactor)
 
         # crossedZVector *= _originVector.magnitude
 
@@ -303,7 +323,7 @@ def main(varFromOperator):
 
         radius *= radiusGeneralThickness
 
-        #radius = vertexIteration / 10
+        # radius = vertexIteration / 10
 
         searchedPos = mesh.vertices[vertexIndex].co
         correctPosIndex = 91919191
@@ -317,7 +337,9 @@ def main(varFromOperator):
                                    ].radius = radius, radius
 
     treeMesh.free()
-
+    for col in bpy.data.collections:
+        for obj in col.all_objects:
+            obj.select_set(False)
 
 ####################################################################################################################################
 ####################################################################################################################################
@@ -379,6 +401,20 @@ class SimpleOperator(bpy.types.Operator):
         min=0.6,
         max=1.7)
 
+    lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
+        name='relative Astverkürzung',
+        description='relative Astverkürzung',
+        default=1.2,
+        min=1,
+        max=1.9)
+
+    lengthStandardDerivationFactor: bpy.props.FloatProperty(
+        name='Astverkürzung Zufallsabweichung',
+        description='XYZ',
+        default=0.4,
+        min=0.1,
+        max=0.85)
+
     radiusReductionAcceleration: bpy.props.FloatProperty(
         name='RadiusVerkürzung',
         description='XYZ',
@@ -393,19 +429,11 @@ class SimpleOperator(bpy.types.Operator):
         min=0.1,
         max=1)
 
-    lengthStandardDerivationFactor: bpy.props.FloatProperty(
-        name='Astverkürzung Zufallsabweichung',
-        description='XYZ',
-        default=0.4,
-        min=0.1,
-        max=0.85)
-
-    lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
-        name='lengthDividerIterationMultiplicator',
-        description='relative Astverkürzung',
-        default=1.2,
-        min=1,
-        max=1.9)
+    generateLeafs: bpy.props.BoolProperty(
+        name='Blätter generieren',
+        description='Schaltet um, ob Blätter generiert werden',
+        default=True
+    )
 
     def invoke(self, context, event):
         wm = context.window_manager
