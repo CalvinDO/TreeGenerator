@@ -443,45 +443,38 @@ class SimpleOperator(bpy.types.Operator):
         min=3,
         max=12)
 
-    subdivViewportRes: bpy.props.IntProperty(
-        name='Viewport Auflösung',
-        description='Noch keine Funktion',
-        default=7,
-        min=3,
-        max=12)
-
     lengthDevider: bpy.props.FloatProperty(
         name='Astverkürzung',
         description='XYZ',
         default=1,
-        min=0.6,
-        max=1.7)
+        min=1,
+        max=2.5)
 
     lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
         name='relative Astverkürzung',
         description='relative Astverkürzung',
         default=1.2,
         min=1,
-        max=1.9)
+        max=2)
 
     lengthStandardDerivationFactor: bpy.props.FloatProperty(
         name='Astverkürzung Zufallsabweichung',
         description='XYZ',
-        default=0.4,
-        min=0.1,
+        default=0.3,
+        min=0,
         max=0.85)
 
     spaceOptimizationFactor: bpy.props.FloatProperty(
         name='Platzoptimierung',
         description='Platzoptimierung',
-        default=0.5,
+        default=0.7,
         min=0,
         max=1)
 
     sunOptimizationFactor: bpy.props.FloatProperty(
         name='Sonnenoptimierung',
         description='Sonnenoptimierung',
-        default=0.5,
+        default=0.25,
         min=0,
         max=1)
 
