@@ -63,7 +63,7 @@ def main(varFromOperator):
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
-    mat = bpy.data.materials.get("TreeBark.002")
+    mat = bpy.data.materials.get("TreeBark")
 
     # Assign it to object
     if treeObject.data.materials:
