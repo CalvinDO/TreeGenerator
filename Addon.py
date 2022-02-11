@@ -63,11 +63,15 @@ def main(varFromOperator):
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
-    # old skin modifier
+    mat = bpy.data.materials.get("TreeBark.002")
 
-    def map_range(v, from_min, from_max, to_min, to_max):
-        """Bringt einen Wert v von einer Skala (from_min, from_max) auf eine neue Skala (to_min, to_max)"""
-        return to_min + (v - from_min) * (to_max - to_min) / (from_max - from_min)
+    # Assign it to object
+    if treeObject.data.materials:
+        # assign to 1st material slot
+        treeObject.data.materials[0] = mat
+    else:
+        # no slots
+        treeObject.data.materials.append(mat)
 
     print(" ------- ")
 
