@@ -135,6 +135,7 @@ def main(varFromOperator):
         iteration: int
         lengthDevider: float
         currentVertexIndex: int = 0
+        positionSumVector: mathutils.Vector = mathutils.Vector((0, 0, 0))
 
         def __init__(self, vertex, branchVector, iteration, lengthDevider):
             self.vertex = vertex
@@ -146,6 +147,9 @@ def main(varFromOperator):
             vertexIterations[Branch.currentVertexIndex] = self.iteration
             vertexPositions[Branch.currentVertexIndex] = self.vertex.co
             Branch.currentVertexIndex += 1
+
+            # Branch.positionSumVector += mathutils.Vector(
+            #    (self.branchVector.x, self.branchVector.y, 0))
 
         def fork(self):
 
@@ -370,9 +374,6 @@ class SimpleOperator(bpy.types.Operator):
             ('leaf 7', "leaf 7", ""),
             ('leaf 8', "leaf 8", ""),
             ('leaf 9', "leaf 9", ""),
-            ('leaf 10', "leaf 10", ""),
-            ('testbranch', "testbranch", ""),
-            ('pine_tree', "pine_tree", ""),
         ),
         default='leaf 1'
     )
@@ -450,7 +451,7 @@ class SimpleOperator(bpy.types.Operator):
 
 class LayoutDemoPanel(bpy.types.Panel):
     """Creates a Panel in the scene context of the properties editor"""
-    bl_label = "Tree Generator"
+    bl_label = "TreeGenerator"
     bl_idname = "SCENE_PT_layout"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
