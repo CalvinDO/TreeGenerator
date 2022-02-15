@@ -66,7 +66,9 @@ def main(varFromOperator):
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
 
-    mat = bpy.data.materials.get("TreeBark")
+    treeMatName = varFromOperator.branchMaterial
+
+    mat = bpy.data.materials.get(treeMatName)
 
     # Assign it to object
     if treeObject.data.materials:
@@ -400,7 +402,7 @@ def main(varFromOperator):
     for col in bpy.data.collections:
         for obj in col.all_objects:
             obj.select_set(False)
-
+    leafObject.hide_set(True)
 
 ####################################################################################################################################
 ####################################################################################################################################
@@ -440,18 +442,25 @@ class SimpleOperator(bpy.types.Operator):
     leaf: bpy.props.StringProperty(
         name='Blatt',
         description='Name des Blattes in der Szene',
-        default='leaf 1'
+        default='leaf 4'
+    )
+
+    branchMaterial: bpy.props.StringProperty(
+        name='Zweig-Material',
+        description='Name des Materials, welches die Äste bekommen sollen',
+        default='TreeBark'
     )
 
     generatedObjectsCollection: bpy.props.StringProperty(
         name='GenerierteObjekteCollection',
-        description='Name der Collection, in der die generierten Objekte abgelegt werden'
+        description='Name der Collection, in der die generierten Objekte abgelegt werden',
+        default='TreeCollection'
     )
 
     angle: bpy.props.FloatProperty(
         name='Winkel',
         description='Winkel zwischen den Ästen',
-        default=25,
+        default=28,
         min=10,
         max=45)
 
@@ -465,49 +474,49 @@ class SimpleOperator(bpy.types.Operator):
     lengthDevider: bpy.props.FloatProperty(
         name='Astverkürzung',
         description='Faktor, um den jeder Ast durchschnittlich kürzer ist als sein Vorgänger',
-        default=1,
+        default=1.03,
         min=1,
         max=2.5)
 
     lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
         name='relative Astverkürzung',
         description='Faktor, mit dem sich die Astverkürzung pro Abspaltung erhöht',
-        default=1.2,
+        default=1.17,
         min=1,
         max=2)
 
     lengthStandardDerivationFactor: bpy.props.FloatProperty(
         name='Astverkürzung Zufallsabweichung',
         description='Multiplikative Abweichungs-Range, in der sich die Astverkürzung zufällig bewegt',
-        default=0.3,
+        default=0.07,
         min=0,
         max=0.85)
 
     spaceOptimizationFactor: bpy.props.FloatProperty(
         name='Platzoptimierung',
         description='Einfluss-Faktor der Platzoptimierung',
-        default=0.7,
+        default=0.91,
         min=0,
         max=1)
 
     sunOptimizationFactor: bpy.props.FloatProperty(
         name='Sonnenoptimierung',
         description='Einfluss-Faktor der Sonnenoptimierung',
-        default=0.25,
+        default=0.52,
         min=0,
         max=1)
 
     radiusReductionAcceleration: bpy.props.FloatProperty(
         name='Radius Verkürzung',
         description='Faktor, mit dem sich der Radius pro Abspaltung verkleinert',
-        default=2.5,
+        default=2.05,
         min=0.5,
         max=4)
 
     radiusGeneralThickness: bpy.props.FloatProperty(
         name='Radius',
         description='Initialer Radius, nichtlinear',
-        default=0.5,
+        default=0.35,
         min=0.1,
         max=1)
 
