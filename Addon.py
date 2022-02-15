@@ -38,6 +38,12 @@ def main(varFromOperator):
 ####################################################################################################################################
 ####################################################################################################################################
 
+    prefabLeafCollection = varFromOperator.leafCollection
+
+    for col in bpy.data.collections:
+        for obj in col.all_objects:
+            obj.select_set(False)
+
     # selektiert alle Objekte in Collection "Collection"
     for obj in bpy.data.collections['TreeCollection'].all_objects:
         obj.select_set(True)
@@ -45,7 +51,7 @@ def main(varFromOperator):
     for obj in bpy.data.collections['GeneratedLeafs'].all_objects:
         obj.select_set(True)
 
-    for obj in bpy.data.collections['PrefabLeafs'].all_objects:
+    for obj in prefabLeafCollection.all_objects:
         obj.select_set(False)
         obj.hide_set(False)
 
@@ -88,7 +94,7 @@ def main(varFromOperator):
 
     radiusGeneralThickness: float = varFromOperator.radiusGeneralThickness
 
-    treeType = varFromOperator.Baumarten
+    treeType = varFromOperator.leafType
     print(treeType)
 
     generateLeafs: bool = varFromOperator.generateLeafs
@@ -115,7 +121,6 @@ def main(varFromOperator):
 
     leafObject: Object = bpy.data.objects[treeType]
     leafObject.select_set(True)
-    loc = leafObject.matrix_world.to_translation()
 
     sunVector: mathutils.Vector = ((0, 0, 1))
 
@@ -237,10 +242,9 @@ def main(varFromOperator):
                 spaceAnglePercentage *= spaceBoostFactor
                 spaceBoostFactor = np.clip(1 - spaceAnglePercentage, 0.02, 1)
 
-        print(spaceBoostFactor)
         outputVert.co += (lastStarVecCopy *
                           (illuminationBoostFactor * spaceBoostFactor))
-        print("ill * space ", illuminationBoostFactor * spaceBoostFactor)
+
         return outputVert
 
     def getExtrudedFirstStarVert(_centerVert: BMVert, _originVector: mathutils.Vector, _trunc: mathutils.Vector, _lengthDivider):
@@ -400,7 +404,7 @@ def main(varFromOperator):
     for col in bpy.data.collections:
         for obj in col.all_objects:
             obj.select_set(False)
-    for obj in bpy.data.collections['PrefabLeafs'].all_objects:
+    for obj in prefabLeafCollection.all_objects:
         obj.hide_set(True)
 ####################################################################################################################################
 ####################################################################################################################################
@@ -416,7 +420,7 @@ class SimpleOperator(bpy.types.Operator):
     bl_label = "Generate Tree"
     bl_options = {"REGISTER", "UNDO"}
 
-    Baumarten: bpy.props.EnumProperty(
+    leafType: bpy.props.EnumProperty(
         items=(
             ('leaf 1', "leaf 1", ""),
             ('leaf 2', "leaf 2", ""),
@@ -429,6 +433,12 @@ class SimpleOperator(bpy.types.Operator):
             ('leaf 9', "leaf 9", ""),
         ),
         default='leaf 1'
+    )
+
+    generateLeafs: bpy.props.BoolProperty(
+        name='Blätter generieren',
+        description='Schaltet um, ob Blätter generiert werden',
+        default=True
     )
 
     angle: bpy.props.FloatProperty(
@@ -493,12 +503,6 @@ class SimpleOperator(bpy.types.Operator):
         default=0.5,
         min=0.1,
         max=1)
-
-    generateLeafs: bpy.props.BoolProperty(
-        name='Blätter generieren',
-        description='Schaltet um, ob Blätter generiert werden',
-        default=True
-    )
 
     def invoke(self, context, event):
         wm = context.window_manager
