@@ -1,3 +1,4 @@
+from quopri import decodestring
 from re import S, search
 from numpy.core.numeric import cross, outer
 import numpy as np
@@ -38,34 +39,29 @@ def main(varFromOperator):
 ####################################################################################################################################
 ####################################################################################################################################
 
-    prefabLeafCollection = varFromOperator.leafCollection
-
     for col in bpy.data.collections:
         for obj in col.all_objects:
             obj.select_set(False)
 
-    # selektiert alle Objekte in Collection "Collection"
-    for obj in bpy.data.collections['TreeCollection'].all_objects:
-        obj.select_set(True)
+    # selektiert alle Generierten Objekte
 
-    for obj in bpy.data.collections['GeneratedLeafs'].all_objects:
-        obj.select_set(True)
+    generatedObjectsCollectionName = varFromOperator.generatedObjectsCollection
 
-    for obj in prefabLeafCollection.all_objects:
-        obj.select_set(False)
-        obj.hide_set(False)
+    try:
+        for obj in bpy.data.collections[generatedObjectsCollectionName].all_objects:
+            obj.select_set(True)
+    except KeyError:
+        print("Name der Collection für die generierten Objekte ist ungültig!")
+        pass
 
-    for obj in bpy.data.collections['LightAndCam'].all_objects:
-        obj.select_set(False)
-
-    # bpy.ops.object.select_all(action='SELECT')  # selektiert alle Objekte
     # löscht selektierte objekte
     bpy.ops.object.delete(use_global=False, confirm=False)
     bpy.ops.outliner.orphans_purge()  # löscht überbleibende Meshdaten etc
 
     mesh: Mesh = bpy.data.meshes.new("tree mesh")
     treeObject: Object = bpy.data.objects.new("tree object", mesh)
-    bpy.data.collections['TreeCollection'].objects.link(treeObject)
+    bpy.data.collections[generatedObjectsCollectionName].objects.link(
+        treeObject)
 
     treeMesh: BMesh = bmesh.new()
     treeMesh.from_mesh(mesh)
@@ -94,9 +90,6 @@ def main(varFromOperator):
 
     radiusGeneralThickness: float = varFromOperator.radiusGeneralThickness
 
-    treeType = varFromOperator.leafType
-    print(treeType)
-
     generateLeafs: bool = varFromOperator.generateLeafs
 
     sunOptimizationFactor: float = varFromOperator.sunOptimizationFactor
@@ -119,8 +112,15 @@ def main(varFromOperator):
 
     # leafs:
 
-    leafObject: Object = bpy.data.objects[treeType]
-    leafObject.select_set(True)
+    if generateLeafs:
+
+        try:
+
+            leafObject: Object = bpy.data.objects[varFromOperator.leaf]
+        except KeyError:
+            print("Please enter the name of a leaf in your scene!")
+            return
+        leafObject.select_set(True)
 
     sunVector: mathutils.Vector = ((0, 0, 1))
 
@@ -168,7 +168,7 @@ def main(varFromOperator):
                     return
 
                 duplicatedLeaf: Object = duplicate(
-                    leafObject, collection=bpy.data.collections['GeneratedLeafs'])
+                    leafObject, collection=bpy.data.collections[generatedObjectsCollectionName])
                 duplicatedLeaf.location = self.vertex.co
 
                 branchVectorRotation: mathutils.Quaternion = self.branchVector.to_track_quat(
@@ -285,14 +285,10 @@ def main(varFromOperator):
                     (rotatedOriginVector.x, rotatedOriginVector.y, 0))
                 currentDirectionXY.normalize()
 
-                print(Branch.currentVertexIndex)
-
                 spaceAnglePercentage: float = currentDirectionXY.angle(
                     currentNegatedSumVector) / (math.pi / 2)
                 spaceAnglePercentage *= spaceBoostFactor
                 spaceBoostFactor = np.clip(1 - spaceAnglePercentage, 0.02, 1)
-
-        print("ill * space ", illuminationBoostFactor * spaceBoostFactor)
 
         firstStarVert.co += (rotatedOriginVector *
                              (illuminationBoostFactor * spaceBoostFactor))
@@ -404,8 +400,8 @@ def main(varFromOperator):
     for col in bpy.data.collections:
         for obj in col.all_objects:
             obj.select_set(False)
-    for obj in prefabLeafCollection.all_objects:
-        obj.hide_set(True)
+
+
 ####################################################################################################################################
 ####################################################################################################################################
 ################################DEMO###############################################################################################
@@ -420,20 +416,20 @@ class SimpleOperator(bpy.types.Operator):
     bl_label = "Generate Tree"
     bl_options = {"REGISTER", "UNDO"}
 
-    leafType: bpy.props.EnumProperty(
-        items=(
-            ('leaf 1', "leaf 1", ""),
-            ('leaf 2', "leaf 2", ""),
-            ('leaf 3', "leaf 3", ""),
-            ('leaf 4', "leaf 4", ""),
-            ('leaf 5', "leaf 5", ""),
-            ('leaf 6', "leaf 6", ""),
-            ('leaf 7', "leaf 7", ""),
-            ('leaf 8', "leaf 8", ""),
-            ('leaf 9', "leaf 9", ""),
-        ),
-        default='leaf 1'
-    )
+    # leafType: bpy.props.EnumProperty(
+    #     items=(
+    #         ('leaf 1', "leaf 1", ""),
+    #         ('leaf 2', "leaf 2", ""),
+    #         ('leaf 3', "leaf 3", ""),
+    #         ('leaf 4', "leaf 4", ""),
+    #         ('leaf 5', "leaf 5", ""),
+    #         ('leaf 6', "leaf 6", ""),
+    #         ('leaf 7', "leaf 7", ""),
+    #         ('leaf 8', "leaf 8", ""),
+    #         ('leaf 9', "leaf 9", ""),
+    #     ),
+    #     default='leaf 1'
+    # )
 
     generateLeafs: bpy.props.BoolProperty(
         name='Blätter generieren',
@@ -441,65 +437,76 @@ class SimpleOperator(bpy.types.Operator):
         default=True
     )
 
+    leaf: bpy.props.StringProperty(
+        name='Blatt',
+        description='Name des Blattes in der Szene',
+        default='leaf 1'
+    )
+
+    generatedObjectsCollection: bpy.props.StringProperty(
+        name='GenerierteObjekteCollection',
+        description='Name der Collection, in der die generierten Objekte abgelegt werden'
+    )
+
     angle: bpy.props.FloatProperty(
         name='Winkel',
-        description='XYZ',
+        description='Winkel zwischen den Ästen',
         default=25,
         min=10,
         max=45)
 
     maxIteration: bpy.props.IntProperty(
-        name='Ast-Abspaltungen',
-        description='XYZ',
+        name='Ast-Abspaltungen/ Iterationen',
+        description='Anzahl der Ast-Abspaltungen/ Iterationen. (Achtung, Blätteranzahl verdoppelt sich pro Iteration!)',
         default=7,
         min=3,
-        max=12)
+        max=10)
 
     lengthDevider: bpy.props.FloatProperty(
         name='Astverkürzung',
-        description='XYZ',
+        description='Faktor, um den jeder Ast durchschnittlich kürzer ist als sein Vorgänger',
         default=1,
         min=1,
         max=2.5)
 
     lengthDividerIterationMultiplicator: bpy.props.FloatProperty(
         name='relative Astverkürzung',
-        description='relative Astverkürzung',
+        description='Faktor, mit dem sich die Astverkürzung pro Abspaltung erhöht',
         default=1.2,
         min=1,
         max=2)
 
     lengthStandardDerivationFactor: bpy.props.FloatProperty(
         name='Astverkürzung Zufallsabweichung',
-        description='XYZ',
+        description='Multiplikative Abweichungs-Range, in der sich die Astverkürzung zufällig bewegt',
         default=0.3,
         min=0,
         max=0.85)
 
     spaceOptimizationFactor: bpy.props.FloatProperty(
         name='Platzoptimierung',
-        description='Platzoptimierung',
+        description='Einfluss-Faktor der Platzoptimierung',
         default=0.7,
         min=0,
         max=1)
 
     sunOptimizationFactor: bpy.props.FloatProperty(
         name='Sonnenoptimierung',
-        description='Sonnenoptimierung',
+        description='Einfluss-Faktor der Sonnenoptimierung',
         default=0.25,
         min=0,
         max=1)
 
     radiusReductionAcceleration: bpy.props.FloatProperty(
         name='Radius Verkürzung',
-        description='XYZ',
+        description='Faktor, mit dem sich der Radius pro Abspaltung verkleinert',
         default=2.5,
         min=0.5,
         max=4)
 
     radiusGeneralThickness: bpy.props.FloatProperty(
         name='Radius',
-        description='XYZ',
+        description='Initialer Radius, nichtlinear',
         default=0.5,
         min=0.1,
         max=1)
